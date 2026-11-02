@@ -12,6 +12,7 @@ import { getDemoEquipmentById, getDemoProjects } from "@/lib/demoStore";
 import { ArrowLeft, LogIn, LogOut, RefreshCw } from "lucide-react";
 import BlueprintPlaceholder from "@/components/lab/BlueprintPlaceholder";
 import InventoryDialog from "@/components/inventory/InventoryDialog";
+import InventoryQrCode from "@/components/inventory/InventoryQrCode";
 import { Alert, DemoBanner, Field, Toast, checkoutChip, equipmentStatusChip } from "@/components/inventory/InventoryUi";
 import styles from "@/components/inventory/inventory.module.css";
 import { optimizeImageUrl } from "@/lib/cloudinaryMedia";
@@ -320,6 +321,8 @@ export default function EquipmentDetailPage(){
             Showing local sample component details. Checkout and return stay disabled so demo data is never sent to the real API.
           </DemoBanner>
         )}
+
+        <InventoryQrCode equipmentId={item._id || item.id} qrCodeId={item.qrCodeId} equipmentName={item.name} />
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="nb-card overflow-hidden">

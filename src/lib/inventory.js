@@ -44,7 +44,8 @@ export const inventoryService = {
     try {
       requireApiUrl();
       const query = toQuery({ categoryId, status, q, limit, skip });
-      const res = await apiRequest(`${API_BASE_URL}/inventory/equipment${query}`, { cache: 'no-store' });
+      await authService.ensureValidToken();
+      const res = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/inventory/equipment${query}`, { method: 'GET', cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const data = await safeParseJson(res);
       if (data?.success === false) {
@@ -65,10 +66,21 @@ export const inventoryService = {
     }
   },
 
+  // GET /api/inventory/equipment/qr/:qrCodeId
+  async getEquipmentByQrCode(qrCodeId) {
+    await authService.ensureValidToken();
+    const res = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/inventory/equipment/qr/${encodeURIComponent(qrCodeId)}`, { method: 'GET', cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status === 404 ? 'QR label not recognized.' : `QR lookup failed: HTTP ${res.status}`);
+    const data = await safeParseJson(res);
+    if (data?.success === false || !data?.data?.item) throw new Error(data?.message || 'QR lookup failed.');
+    return data.data.item;
+  },
+
   // GET /api/inventory/equipment/:id
   async getEquipment(id) {
     try {
-      const res = await apiRequest(`${API_BASE_URL}/inventory/equipment/${id}`, { cache: 'no-store' });
+      await authService.ensureValidToken();
+      const res = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/inventory/equipment/${id}`, { method: 'GET', cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const data = await safeParseJson(res);
       if (data?.success === false) {
@@ -136,6 +148,20 @@ export const inventoryService = {
     } catch (error) {
       throw error;
     }
+  },
+
+  // POST /api/inventory/equipment/:id/adjust-stock (admin only)
+  async adjustStock(id, { delta, reason }) {
+    await authService.ensureValidToken();
+    const res = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/inventory/equipment/${id}/adjust-stock`, {
+      method: 'POST',
+      body: JSON.stringify({ delta, reason }),
+    });
+    const data = await safeParseJson(res);
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.error?.message || data?.message || 'Stock adjustment failed');
+    }
+    return data?.data?.item;
   },
 
   // POST /api/inventory/equipment/:id/checkout (auth: team_member+)
@@ -332,7 +358,8 @@ export const inventoryService = {
   async listCategories() {
     try {
       requireApiUrl();
-      const res = await apiRequest(`${API_BASE_URL}/inventory/categories`, { cache: 'no-store' });
+      await authService.ensureValidToken();
+      const res = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/inventory/categories`, { method: 'GET', cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const data = await safeParseJson(res);
       if (data?.success === false) {
@@ -484,12 +511,12 @@ export const inventoryService = {
     return data;
   },
 
-  async reviewComponentRequest(requestId, { status, reviewNotes } = {}) {
+  async reviewComponentRequest(requestId, { status, reviewNotes, projectId } = {}) {
     requireApiUrl();
     const action = status === 'approved' ? 'approve' : 'reject';
     const data = await authenticatedInventoryRequest(
       `${API_BASE_URL}/inventory/requests/${encodeURIComponent(requestId)}/${action}`,
-      { method: 'POST', body: JSON.stringify({ reviewNotes }) },
+      { method: 'POST', body: JSON.stringify({ reviewNotes, ...(projectId !== undefined && projectId !== '' ? { projectId } : { projectId: null }) }) },
       'Failed to review component request'
     );
     if (!data?.request?._id) throw new Error('The component request response is incomplete.');
