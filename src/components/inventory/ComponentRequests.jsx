@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ClipboardList, PackagePlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,7 +38,7 @@ function AdminRequestsPanel({ user }) {
   const [notes, setNotes] = useState({});
   const [assignments, setAssignments] = useState({});
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -53,11 +53,11 @@ function AdminRequestsPanel({ user }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (isAdmin) refresh();
-  }, [isAdmin]);
+  }, [isAdmin, refresh]);
 
   if (!isAdmin) return null;
 
