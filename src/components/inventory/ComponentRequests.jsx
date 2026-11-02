@@ -27,6 +27,106 @@ function normalizedStatus(status) {
   return ["approved", "rejected"].includes(status) ? status : "pending";
 }
 
+
+function AdminRequestsPanel({ user }) {
+  const isAdmin = user?.role === "admin" || (user?.permissions || []).includes("system:admin");
+  const [items, setItems] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState("");
+  const [notes, setNotes] = useState({});
+  const [assignments, setAssignments] = useState({});
+
+  const refresh = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [requests, projectData] = await Promise.all([
+        inventoryService.listComponentRequests({ status: "pending", limit: 100 }),
+        listInventoryProjects(),
+      ]);
+      setItems(requests.items || []);
+      setProjects(projectData.projects || []);
+    } catch (err) {
+      setError(err.message || "Could not load pending requests.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) refresh();
+  }, [isAdmin]);
+
+  if (!isAdmin) return null;
+
+  const review = async (request, status) => {
+    setBusyId(String(request._id));
+    setError("");
+    try {
+      await inventoryService.reviewComponentRequest(request._id, {
+        status,
+        reviewNotes: notes[request._id] || "",
+        ...(status === "approved" ? { projectId: assignments[request._id] || null } : {}),
+      });
+      setItems((current) => current.filter((item) => String(item._id) !== String(request._id)));
+    } catch (err) {
+      setError(err.message || "Could not review this request.");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  return (
+    <section aria-labelledby="admin-request-review-title" className="nb-card flex flex-col gap-5 p-6 sm:p-8">
+      <div>
+        <span className="nb-eyebrow"><span className="nb-eyebrow-num">[ADMIN]</span> Allocation queue</span>
+        <h2 id="admin-request-review-title" className="mt-2 font-display text-2xl font-semibold">Pending component requests</h2>
+        <p className="text-sm text-ink-muted">Review stock, choose the final project assignment if required, then approve or reject.</p>
+      </div>
+      {error && <Alert>{error}</Alert>}
+      {loading ? <p role="status" className="text-sm text-ink-muted">Loading requests…</p> : items.length === 0 ? (
+        <p className="text-sm text-ink-muted">No pending requests.</p>
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {items.map((request) => {
+            const id = String(request._id);
+            const projectId = request.projectId?._id || request.projectId || "";
+            const source = request.equipmentId?.currentQuantity;
+            return (
+              <li key={id} className="rounded-lg border border-line p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="m-0 font-semibold">{request.componentName} · {request.quantity}</h3>
+                    <p className="m-0 mt-1 text-sm text-ink-muted">Requested by {request.requesterId?.firstName || "Member"} {request.requesterId?.lastName || ""} · {request.projectId?.title || "No project specified"}</p>
+                    <p className="mt-2 text-sm">{request.purpose}</p>
+                  </div>
+                  <span className="nb-chip-amber">Pending</span>
+                </div>
+                <Field id={`request-assignment-${id}`} label="Final project assignment (optional)" hint="Leave blank to approve without assigning to a project.">
+                  <select id={`request-assignment-${id}`} className="nb-input" value={assignments[id] ?? String(projectId)} onChange={(event) => setAssignments((current) => ({ ...current, [id]: event.target.value }))}>
+                    <option value="">No project</option>
+                    {projects.map((project) => <option key={project._id || project.id} value={String(project._id || project.id)}>{displayName(project)}</option>)}
+                  </select>
+                </Field>
+                <Field id={`request-notes-${id}`} label="Review notes (optional)">
+                  <textarea id={`request-notes-${id}`} className="nb-textarea" rows={2} maxLength={2000} value={notes[id] || ""} onChange={(event) => setNotes((current) => ({ ...current, [id]: event.target.value }))} />
+                </Field>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" className="nb-btn nb-btn-primary" disabled={busyId === id} onClick={() => review(request, "approved")}>{busyId === id ? "Saving…" : "Approve & allocate"}</button>
+                  <button type="button" className="nb-btn nb-btn-secondary" disabled={busyId === id} onClick={() => review(request, "rejected")}>Reject</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <button type="button" className="nb-btn nb-btn-secondary self-start" onClick={refresh} disabled={loading}>Refresh queue</button>
+    </section>
+  );
+}
+
 export default function ComponentRequests() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const userId = user?.id || user?._id || "";
@@ -257,6 +357,7 @@ export default function ComponentRequests() {
             </section>
           </div>
         )}
+        <AdminRequestsPanel user={user} />
       </div>
     </main>
   );
