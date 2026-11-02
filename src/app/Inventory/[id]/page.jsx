@@ -322,7 +322,7 @@ export default function EquipmentDetailPage(){
           </DemoBanner>
         )}
 
-        <InventoryQrCode equipmentId={item._id || item.id} equipmentName={item.name} />
+        <InventoryQrCode equipmentId={item._id || item.id} qrCodeId={item.qrCodeId} equipmentName={item.name} />
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="nb-card overflow-hidden">
