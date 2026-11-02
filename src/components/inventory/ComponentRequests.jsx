@@ -100,6 +100,7 @@ function AdminRequestsPanel({ user }) {
                   <div>
                     <h3 className="m-0 font-semibold">{request.componentName} · {request.quantity}</h3>
                     <p className="m-0 mt-1 text-sm text-ink-muted">Requested by {request.requesterId?.firstName || "Member"} {request.requesterId?.lastName || ""} · {request.projectId?.title || "No project specified"}</p>
+                    <p className="m-0 mt-1 text-xs text-ink-muted">Current General Lab stock: {request.equipmentId?.currentQuantity ?? "Not linked to a catalogue item"}</p>
                     <p className="mt-2 text-sm">{request.purpose}</p>
                   </div>
                   <span className="nb-chip-amber">Pending</span>
