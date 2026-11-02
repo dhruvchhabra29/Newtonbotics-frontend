@@ -150,6 +150,20 @@ export const inventoryService = {
     }
   },
 
+  // POST /api/inventory/equipment/:id/adjust-stock (admin only)
+  async adjustStock(id, { delta, reason }) {
+    await authService.ensureValidToken();
+    const res = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/inventory/equipment/${id}/adjust-stock`, {
+      method: 'POST',
+      body: JSON.stringify({ delta, reason }),
+    });
+    const data = await safeParseJson(res);
+    if (!res.ok || data?.success === false) {
+      throw new Error(data?.error?.message || data?.message || 'Stock adjustment failed');
+    }
+    return data?.data?.item;
+  },
+
   // POST /api/inventory/equipment/:id/checkout (auth: team_member+)
   async checkoutEquipment(id, { 
     quantity = 1, 
@@ -344,7 +358,8 @@ export const inventoryService = {
   async listCategories() {
     try {
       requireApiUrl();
-      const res = await apiRequest(`${API_BASE_URL}/inventory/categories`, { cache: 'no-store' });
+      await authService.ensureValidToken();
+      const res = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/inventory/categories`, { method: 'GET', cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const data = await safeParseJson(res);
       if (data?.success === false) {
