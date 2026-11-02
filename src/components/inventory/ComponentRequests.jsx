@@ -27,17 +27,6 @@ function normalizedStatus(status) {
   return ["approved", "rejected"].includes(status) ? status : "pending";
 }
 
-const projectGroups = [
-  { key: "ongoing", label: "Ongoing" },
-  { key: "completed", label: "Completed" },
-  { key: "other", label: "Other" },
-];
-
-function projectGroupForStatus(status) {
-  if (status === "ongoing" || status === "completed") return status;
-  return "other";
-}
-
 export default function ComponentRequests() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const userId = user?.id || user?._id || "";
@@ -52,16 +41,11 @@ export default function ComponentRequests() {
   const [quantity, setQuantity] = useState("1");
   const [purpose, setPurpose] = useState("");
   const [projectId, setProjectId] = useState("");
-  const [projectGroup, setProjectGroup] = useState("ongoing");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const eligibleProjects = projects;
-  const groupedProjects = useMemo(
-    () => eligibleProjects.filter((project) => projectGroupForStatus(project.status) === projectGroup),
-    [eligibleProjects, projectGroup]
-  );
   const selectedEquipment = equipment.find((item) => String(item._id || item.id) === componentChoice);
   const componentName = componentChoice === "other" ? customComponent.trim() : (selectedEquipment?.name || "");
   const canChooseProject = eligibleProjects.some((project) => String(project._id || project.id) === projectId);
