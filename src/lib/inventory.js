@@ -65,6 +65,15 @@ export const inventoryService = {
     }
   },
 
+  // GET /api/inventory/equipment/qr/:qrCodeId
+  async getEquipmentByQrCode(qrCodeId) {
+    const res = await apiRequest(`${API_BASE_URL}/inventory/equipment/qr/${encodeURIComponent(qrCodeId)}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status === 404 ? 'QR label not recognized.' : `QR lookup failed: HTTP ${res.status}`);
+    const data = await safeParseJson(res);
+    if (data?.success === false || !data?.data?.item) throw new Error(data?.message || 'QR lookup failed.');
+    return data.data.item;
+  },
+
   // GET /api/inventory/equipment/:id
   async getEquipment(id) {
     try {
