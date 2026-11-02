@@ -511,12 +511,12 @@ export const inventoryService = {
     return data;
   },
 
-  async reviewComponentRequest(requestId, { status, reviewNotes } = {}) {
+  async reviewComponentRequest(requestId, { status, reviewNotes, projectId } = {}) {
     requireApiUrl();
     const action = status === 'approved' ? 'approve' : 'reject';
     const data = await authenticatedInventoryRequest(
       `${API_BASE_URL}/inventory/requests/${encodeURIComponent(requestId)}/${action}`,
-      { method: 'POST', body: JSON.stringify({ reviewNotes }) },
+      { method: 'POST', body: JSON.stringify({ reviewNotes, ...(projectId !== undefined ? { projectId } : {}) }) },
       'Failed to review component request'
     );
     if (!data?.request?._id) throw new Error('The component request response is incomplete.');
