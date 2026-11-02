@@ -6,7 +6,6 @@ import { ArrowLeft, ClipboardList, PackagePlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import inventoryService from "@/lib/inventory";
 import { listInventoryProjects } from "@/lib/inventoryProjects";
-import { getProjectsLedByUser } from "@/lib/projectMembership";
 import { CardSkeletonGrid } from "@/components/PageSkeletons";
 import { Alert, Field } from "./InventoryUi";
 
@@ -58,10 +57,7 @@ export default function ComponentRequests() {
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const eligibleProjects = useMemo(
-    () => getProjectsLedByUser(projects, userId ? { id: userId } : null),
-    [projects, userId]
-  );
+  const eligibleProjects = projects;
   const groupedProjects = useMemo(
     () => eligibleProjects.filter((project) => projectGroupForStatus(project.status) === projectGroup),
     [eligibleProjects, projectGroup]
@@ -69,8 +65,7 @@ export default function ComponentRequests() {
   const selectedEquipment = equipment.find((item) => String(item._id || item.id) === componentChoice);
   const componentName = componentChoice === "other" ? customComponent.trim() : (selectedEquipment?.name || "");
   const canChooseProject = eligibleProjects.some((project) => String(project._id || project.id) === projectId);
-  const submitDisabled = submitting || projectsLoading || eligibleProjects.length === 0 ||
-    !isAuthenticated;
+  const submitDisabled = submitting || projectsLoading || !isAuthenticated;
 
   useEffect(() => {
     let active = true;
@@ -106,8 +101,8 @@ export default function ComponentRequests() {
     event.preventDefault();
     setError("");
     setNotice("");
-    if (!canChooseProject) {
-      setError("Choose one of your eligible projects.");
+    if (projectId && !canChooseProject) {
+      setError("The selected project is unavailable. Choose another project or leave it blank.");
       return;
     }
     if (!componentName) {
@@ -127,13 +122,13 @@ export default function ComponentRequests() {
     setSubmitting(true);
     try {
       const created = await inventoryService.createComponentRequest({
-        projectId,
+        ...(projectId ? { projectId } : {}),
         ...(selectedEquipment && componentChoice !== "other" ? { equipmentId: componentChoice } : { componentName }),
         quantity: requestedQuantity,
         purpose: purpose.trim(),
       });
       setRequests((previous) => [created, ...previous]);
-      setNotice("Request submitted for team leader review.");
+      setNotice("Request submitted for administrator approval.");
       setComponentChoice("");
       setCustomComponent("");
       setQuantity("1");
@@ -164,7 +159,7 @@ export default function ComponentRequests() {
           </span>
           <h1 className="nb-h1 m-0">Request components</h1>
           <p className="nb-lead m-0 max-w-[680px]">
-            Tell us what your project needs. Requests are reviewed separately from inventory checkout and fulfillment.
+            Request any listed component. An administrator reviews availability and decides whether to approve and assign it.
           </p>
         </div>
       </header>
@@ -172,13 +167,13 @@ export default function ComponentRequests() {
       <div className="nb-container flex flex-col gap-6 pb-28 pt-8">
         <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line bg-surface px-4 py-3 text-sm">
           <strong className="font-semibold">Requests are reviewed by an administrator.</strong>
-          <span className="text-ink-muted">Only designated project team leaders can submit component requests.</span>
+          <span className="text-ink-muted">Any active signed-in account can request a part. Approval and allocation are admin-controlled.</span>
         </div>
 
         {!isAuthenticated ? (
           <section aria-labelledby="request-signin-title" className="nb-card flex flex-col items-start gap-4 p-8 sm:p-10">
             <h2 id="request-signin-title" className="m-0 font-display text-2xl font-semibold tracking-[-0.02em]">Sign in to request components</h2>
-            <p className="m-0 text-ink-muted">Sign in with the account designated as a project team leader.</p>
+            <p className="m-0 text-ink-muted">Sign in with your NewtonBotics account to submit a request.</p>
             <Link href="/auth" className="nb-btn nb-btn-primary">Sign in</Link>
           </section>
         ) : (
@@ -192,74 +187,46 @@ export default function ComponentRequests() {
                 </div>
               </div>
 
-              {projectsLoading ? <CardSkeletonGrid count={2} variant="project" /> : projectsError ? (
-                <Alert>
-                  <p className="m-0 font-semibold">Project memberships could not be checked.</p>
-                  <p className="m-0 mt-1">{projectsError}</p>
-                </Alert>
-              ) : eligibleProjects.length === 0 ? (
-                <div role="status" className="flex flex-col items-start gap-2 rounded-lg border border-dashed border-line-strong p-6">
-                  <ClipboardList size={24} aria-hidden="true" className="text-ink-muted" />
-                  <h3 className="m-0 font-display text-lg font-semibold">No led projects found</h3>
-                  <p className="m-0 text-sm text-ink-muted">Your account must be the designated team leader on a project before you can request components.</p>
-                </div>
-              ) : null}
+              {projectsError && <Alert><p className="m-0">Projects could not be loaded. You can still submit a request without assigning it to a project.</p><p className="m-0 mt-1">{projectsError}</p></Alert>}
+              <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+                <Field id="component-request-project" label="Intended project (optional)" hint="This is a request preference only. An administrator confirms the final assignment.">
+                  <select id="component-request-project" value={projectId} onChange={(event) => setProjectId(event.target.value)} className="nb-input truncate pr-8">
+                    <option value="">No project / not sure</option>
+                    {eligibleProjects.map((project) => {
+                      const id = String(project._id || project.id);
+                      return <option key={id} value={id}>{displayName(project)}</option>;
+                    })}
+                  </select>
+                </Field>
 
-              {!projectsLoading && !projectsError && eligibleProjects.length > 0 && (
-                <>
-                <div role="group" aria-label="Eligible project status" className="flex flex-wrap gap-2">
-                  {projectGroups.map((group) => {
-                    const count = eligibleProjects.filter((project) => projectGroupForStatus(project.status) === group.key).length;
-                    const active = projectGroup === group.key;
-                    return <button key={group.key} type="button" aria-pressed={active} className={`nb-pill h-10 px-4 text-sm ${active ? "nb-pill-active" : ""}`} onClick={() => {
-                      setProjectGroup(group.key);
-                      setProjectId((current) => eligibleProjects.some((project) => String(project._id || project.id) === current && projectGroupForStatus(project.status) === group.key) ? current : "");
-                    }}>
-                      {group.label} <span className="font-mono text-[11px] opacity-70">{count}</span>
-                    </button>;
-                  })}
-                </div>
-                <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
-                  <Field id="component-request-project" label="Project" required hint="Only projects where your account is the designated team leader are listed.">
-                    <select id="component-request-project" required value={projectId} onChange={(event) => setProjectId(event.target.value)} className="nb-input truncate pr-8">
-                      <option value="">{groupedProjects.length ? "Select your project" : `No ${projectGroup} projects`}</option>
-                      {groupedProjects.map((project) => {
-                        const id = String(project._id || project.id);
-                        return <option key={id} value={id}>{displayName(project)} · {project.status || "status unavailable"}</option>;
-                      })}
-                    </select>
+                <Field id="component-request-item" label="Component" required hint={equipmentError ? `${equipmentError} You can still enter a component name manually.` : undefined}>
+                  <select id="component-request-item" required value={componentChoice} onChange={(event) => setComponentChoice(event.target.value)} className="nb-input truncate pr-8">
+                    <option value="">Choose from General Lab</option>
+                    {equipment.map((item) => <option key={item._id || item.id} value={String(item._id || item.id)}>{item.name}</option>)}
+                    <option value="other">Other component</option>
+                  </select>
+                </Field>
+
+                {componentChoice === "other" && (
+                  <Field id="component-request-custom" label="Component name" required>
+                    <input id="component-request-custom" required maxLength={255} value={customComponent} onChange={(event) => setCustomComponent(event.target.value)} placeholder="Enter the component name" className="nb-input" />
                   </Field>
+                )}
 
-                  <Field id="component-request-item" label="Component" required hint={equipmentError ? `${equipmentError} You can still enter a component name manually.` : undefined}>
-                    <select id="component-request-item" required value={componentChoice} onChange={(event) => setComponentChoice(event.target.value)} className="nb-input truncate pr-8">
-                      <option value="">Choose from General Lab</option>
-                      {equipment.map((item) => <option key={item._id || item.id} value={String(item._id || item.id)}>{item.name}</option>)}
-                      <option value="other">Other component</option>
-                    </select>
-                  </Field>
+                <Field id="component-request-quantity" label="Quantity" required>
+                  <input id="component-request-quantity" type="number" required min="1" step="1" inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value)} className="nb-input max-w-[200px]" />
+                </Field>
 
-                  {componentChoice === "other" && (
-                    <Field id="component-request-custom" label="Component name" required>
-                      <input id="component-request-custom" required maxLength={120} value={customComponent} onChange={(event) => setCustomComponent(event.target.value)} placeholder="Enter the component name" className="nb-input" />
-                    </Field>
-                  )}
+                <Field id="component-request-purpose" label="Reason / intended use" required>
+                  <textarea id="component-request-purpose" required maxLength={2000} rows={4} value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="Explain why you need these components and how they will be used." className="nb-textarea" />
+                </Field>
 
-                  <Field id="component-request-quantity" label="Quantity" required>
-                    <input id="component-request-quantity" type="number" required min="1" step="1" inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value)} className="nb-input max-w-[200px]" />
-                  </Field>
-
-                  <Field id="component-request-purpose" label="Purpose / justification" required>
-                    <textarea id="component-request-purpose" required maxLength={1000} rows={4} value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="How will these components support the project?" className="nb-textarea" />
-                  </Field>
-
-                  {error && <Alert>{error}</Alert>}
-                  {notice && <Alert kind="success">{notice}</Alert>}
-                  <button className="nb-btn nb-btn-accent self-start" type="submit" disabled={submitDisabled}>
-                    <PackagePlus size={17} aria-hidden="true" /> {submitting ? "Submitting…" : "Submit request"}
-                  </button>
-                </form>
-                </>
-              )}
+                {error && <Alert>{error}</Alert>}
+                {notice && <Alert kind="success">{notice}</Alert>}
+                <button className="nb-btn nb-btn-accent self-start" type="submit" disabled={submitDisabled}>
+                  <PackagePlus size={17} aria-hidden="true" /> {submitting ? "Submitting…" : "Submit request"}
+                </button>
+              </form>
             </section>
 
             <section aria-labelledby="request-history-title" className="nb-card flex flex-col gap-5 p-6 sm:p-8">
