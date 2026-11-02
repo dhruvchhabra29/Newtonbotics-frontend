@@ -516,7 +516,7 @@ export const inventoryService = {
     const action = status === 'approved' ? 'approve' : 'reject';
     const data = await authenticatedInventoryRequest(
       `${API_BASE_URL}/inventory/requests/${encodeURIComponent(requestId)}/${action}`,
-      { method: 'POST', body: JSON.stringify({ reviewNotes, ...(projectId !== undefined ? { projectId } : {}) }) },
+      { method: 'POST', body: JSON.stringify({ reviewNotes, ...(projectId !== undefined && projectId !== '' ? { projectId } : { projectId: null }) }) },
       'Failed to review component request'
     );
     if (!data?.request?._id) throw new Error('The component request response is incomplete.');
