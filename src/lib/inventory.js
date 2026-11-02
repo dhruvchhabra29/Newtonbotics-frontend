@@ -44,7 +44,8 @@ export const inventoryService = {
     try {
       requireApiUrl();
       const query = toQuery({ categoryId, status, q, limit, skip });
-      const res = await apiRequest(`${API_BASE_URL}/inventory/equipment${query}`, { cache: 'no-store' });
+      await authService.ensureValidToken();
+      const res = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/inventory/equipment${query}`, { method: 'GET', cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const data = await safeParseJson(res);
       if (data?.success === false) {
@@ -67,7 +68,8 @@ export const inventoryService = {
 
   // GET /api/inventory/equipment/qr/:qrCodeId
   async getEquipmentByQrCode(qrCodeId) {
-    const res = await apiRequest(`${API_BASE_URL}/inventory/equipment/qr/${encodeURIComponent(qrCodeId)}`, { cache: 'no-store' });
+    await authService.ensureValidToken();
+    const res = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/inventory/equipment/qr/${encodeURIComponent(qrCodeId)}`, { method: 'GET', cache: 'no-store' });
     if (!res.ok) throw new Error(res.status === 404 ? 'QR label not recognized.' : `QR lookup failed: HTTP ${res.status}`);
     const data = await safeParseJson(res);
     if (data?.success === false || !data?.data?.item) throw new Error(data?.message || 'QR lookup failed.');
@@ -77,7 +79,8 @@ export const inventoryService = {
   // GET /api/inventory/equipment/:id
   async getEquipment(id) {
     try {
-      const res = await apiRequest(`${API_BASE_URL}/inventory/equipment/${id}`, { cache: 'no-store' });
+      await authService.ensureValidToken();
+      const res = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/inventory/equipment/${id}`, { method: 'GET', cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const data = await safeParseJson(res);
       if (data?.success === false) {
