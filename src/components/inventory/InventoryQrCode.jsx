@@ -2,11 +2,11 @@
 
 import { useMemo } from "react";
 
-export default function InventoryQrCode({ equipmentId, equipmentName }) {
+export default function InventoryQrCode({ equipmentId, qrCodeId, equipmentName }) {
   const itemUrl = useMemo(() => {
-    if (typeof window === "undefined" || !equipmentId) return "";
-    return new URL(`/Inventory/${encodeURIComponent(equipmentId)}`, window.location.origin).toString();
-  }, [equipmentId]);
+    if (typeof window === "undefined" || !qrCodeId) return "";
+    return new URL(`/Inventory/qr/${encodeURIComponent(qrCodeId)}`, window.location.origin).toString();
+  }, [qrCodeId]);
 
   const qrUrl = useMemo(() => itemUrl
     ? `https://quickchart.io/qr?size=240&margin=2&text=${encodeURIComponent(itemUrl)}`
@@ -33,7 +33,7 @@ export default function InventoryQrCode({ equipmentId, equipmentName }) {
           <span className="max-w-sm break-all font-mono text-xs text-ink-muted">{itemUrl}</span>
         </div>
       </div>
-      <p className="m-0 text-xs text-ink-muted">Scanning identifies the item only. Requests, approvals and stock changes still require the normal authenticated workflow.</p>
+      <p className="m-0 text-xs text-ink-muted">Scanning resolves an opaque asset identifier. Requests, approvals and stock changes still require the normal authenticated workflow.</p>
     </section>
   );
 }
